@@ -1,6 +1,12 @@
 // Initialize the webcam and set event listeners
 function initializeWebcam() {
     const video = document.getElementById('webcam');
+    if (!video) {
+        console.error('Webcam element not found');
+        appendToChatbox('Error: Webcam element not found.', true);
+        return;
+    }
+
     navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
             video.srcObject = stream;
@@ -15,16 +21,15 @@ function initializeWebcam() {
 function captureImage() {
     const video = document.getElementById('webcam');
     const canvas = document.getElementById('canvas');
-    const context = canvas.getContext('2d');
+    const context = canvas?.getContext('2d');
 
     if (!video || !canvas || !context) {
-        console.error('Video or canvas element not found');
-        appendToChatbox('Error: Video or canvas element not found.', true);
+        console.error('Video, canvas, or context element not found');
+        appendToChatbox('Error: Video, canvas, or context element not found.', true);
         return;
     }
 
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-
     const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
     processImage(base64Image);
 }
@@ -60,7 +65,7 @@ function handleResponse(data) {
     toggleLoader(false); // Hide the loader
 
     if (data?.error) {
-        console.error(data.error);
+        console.error('Server error:', data.error);
         appendToChatbox(`Error: ${data.error}`, true);
         return;
     }
@@ -151,3 +156,4 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('capture')?.addEventListener('click', captureImage);
     document.getElementById('switch-camera')?.addEventListener('click', switchCamera());
 });
+
