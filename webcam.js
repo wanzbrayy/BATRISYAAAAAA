@@ -6,8 +6,8 @@ function initializeWebcam() {
             video.srcObject = stream;
         })
         .catch(error => {
-            console.error('getUserMedia error:', error);
-            // You can update this to show an error message to the user in the UI.
+            console.error('getUserMedia error:', error.message || error);
+            appendToChatbox('Error initializing webcam: ' + (error.message || 'Unknown error'), true);
         });
 }
 
@@ -16,6 +16,13 @@ function captureImage() {
     const video = document.getElementById('webcam');
     const canvas = document.getElementById('canvas');
     const context = canvas.getContext('2d');
+
+    if (!video || !canvas || !context) {
+        console.error('Video or canvas element not found');
+        appendToChatbox('Error: Video or canvas element not found.', true);
+        return;
+    }
+
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
@@ -24,6 +31,11 @@ function captureImage() {
 
 // Send the image to the server for processing
 function processImage(base64Image) {
+    if (!base64Image) {
+        appendToChatbox('Error: No image data to process.', true);
+        return;
+    }
+
     toggleLoader(true); // Show the loader
 
     fetch('process_image', {
@@ -33,7 +45,12 @@ function processImage(base64Image) {
         },
         body: JSON.stringify({ image: base64Image })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status} - ${response.statusText}`);
+        }
+        return response.json();
+    })
     .then(handleResponse)
     .catch(handleError);
 }
@@ -41,29 +58,42 @@ function processImage(base64Image) {
 // Handle the server response
 function handleResponse(data) {
     toggleLoader(false); // Hide the loader
-    if(data.error) {
+
+    if (data?.error) {
         console.error(data.error);
         appendToChatbox(`Error: ${data.error}`, true);
         return;
     }
-    appendToChatbox(data.choices[0].message.content);
+
+    const messageContent = data?.choices?.[0]?.message?.content || 'No response content.';
+    appendToChatbox(messageContent);
 }
 
 // Handle any errors during fetch
 function handleError(error) {
     toggleLoader(false); // Hide the loader
-    console.error('Fetch error:', error);
-    appendToChatbox(`Error: ${error.message}`, true);
+    console.error('Fetch error:', error.message || error);
+    appendToChatbox(`Error: ${error.message || 'Unknown error occurred'}`, true);
 }
 
 // Toggle the visibility of the loader
 function toggleLoader(show) {
-    document.querySelector('.loader').style.display = show ? 'block' : 'none';
+    const loader = document.querySelector('.loader');
+    if (!loader) {
+        console.error('Loader element not found');
+        return;
+    }
+    loader.style.display = show ? 'block' : 'none';
 }
 
 // Append messages to the chatbox
 function appendToChatbox(message, isUserMessage = false) {
     const chatbox = document.getElementById('chatbox');
+    if (!chatbox) {
+        console.error('Chatbox element not found');
+        return;
+    }
+
     const messageElement = document.createElement('div');
     const timestamp = new Date().toLocaleTimeString(); // Get the current time as a string
     
@@ -85,6 +115,12 @@ function switchCamera() {
     let usingFrontCamera = true; // This assumes the initial camera is the user-facing one
 
     return function() {
+        if (!video) {
+            console.error('Video element not found');
+            appendToChatbox('Error: Video element not found.', true);
+            return;
+        }
+
         // Toggle the camera type
         usingFrontCamera = !usingFrontCamera;
         const constraints = {
@@ -102,7 +138,8 @@ function switchCamera() {
                 video.srcObject = stream;
             })
             .catch(error => {
-                console.error('Error accessing media devices.', error);
+                console.error('Error accessing media devices:', error.message || error);
+                appendToChatbox('Error switching camera: ' + (error.message || 'Unknown error'), true);
             });
     };
 }
@@ -111,8 +148,6 @@ function switchCamera() {
 document.addEventListener('DOMContentLoaded', function() {
     initializeWebcam();
 
-    document.getElementById('capture').addEventListener('click', captureImage);
-    document.getElementById('switch-camera').addEventListener('click', switchCamera());
-
-    // Other event listeners here...
+    document.getElementById('capture')?.addEventListener('click', captureImage);
+    document.getElementById('switch-camera')?.addEventListener('click', switchCamera());
 });
